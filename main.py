@@ -11,49 +11,39 @@ from dotenv import load_dotenv
 from datetime import datetime
 import json, os, re
 
-# Load env
+
 load_dotenv()
 
-# =========================
-# DATABASE SETUP
-# =========================
+
 DATABASE_URL = os.getenv("DATABASE_URL")
 
 engine = create_engine(DATABASE_URL, pool_pre_ping=True)
 SessionLocal = sessionmaker(bind=engine)
 Base = declarative_base()
 
-# =========================
-# GROQ CLIENT
-# =========================
+
 client = Groq(api_key=os.getenv("GROQ_API_KEY"))
 
-# =========================
-# MODEL
-# =========================
-class Feedback(Base):
-    __tablename__ = "feedback"
+
+class Ticket(Base):
+    __tablename__ = "tickets"
 
     id = Column(Integer, primary_key=True, index=True)
-    customer_id = Column(String)
     text = Column(String)
+    email = Column(String)
+    category = Column(String)
+    urgency = Column(String)
     sentiment = Column(String)
     concern = Column(String)
     created_at = Column(DateTime, default=datetime.utcnow)
 
-# Create table
+# Create table if not exists
 Base.metadata.create_all(bind=engine)
 
-# =========================
-# REQUEST SCHEMA
-# =========================
-class FeedbackRequest(BaseModel):
-    text: str
-    customer_id: str
+class TicketRequest(BaseModel):
+    email: str
+    ticket_text: str
 
-# =========================
-# FASTAPI APP
-# =========================
 app = FastAPI()
 
 app.add_middleware(
@@ -71,23 +61,32 @@ def serve_frontend():
     return FileResponse("static/index.html")
 
 # =========================
-# SENTIMENT API
+# TICKET CLASSIFIER AGENT
 # =========================
-@app.post("/feedback")
-async def analyze_sentiment(req: FeedbackRequest):
+@app.post("/agent/ticket-classifier")
+async def classify_ticket(req: TicketRequest):
+
+    # ✅ Validation
+    if not req.email or not req.ticket_text:
+        raise HTTPException(status_code=400, detail="Invalid input")
+
     try:
-        print("Incoming request:", req.text)
+        print("Incoming request:", req.ticket_text)
 
         prompt = f"""
-You are an AI that analyzes customer feedback.
+You are a support ticket classification agent.
 
-Return ONLY valid JSON (no explanation):
+Return ONLY valid JSON:
+
 {{
-  "sentiment": "Positive" or "Neutral" or "Negative",
-  "key_concern": "short one-line issue"
+  "sentiment": "Positive / Neutral / Negative",
+  "category": "Billing / Technical / General",
+  "urgency": "High / Medium / Low",
+  "concern": "one short summary"
 }}
 
-Feedback: {req.text}
+Ticket:
+{req.ticket_text}
 """
 
         response = client.chat.completions.create(
@@ -99,45 +98,59 @@ Feedback: {req.text}
         raw = response.choices[0].message.content.strip()
         print("LLM RAW:", raw)
 
-        # Clean response
+        # Clean markdown
         raw = raw.replace("```json", "").replace("```", "").strip()
 
         # Extract JSON safely
         match = re.search(r"\{.*\}", raw, re.DOTALL)
         if not match:
-            raise Exception("No valid JSON found in LLM response")
+            raise Exception("No valid JSON found")
 
         result = json.loads(match.group())
+
+        # SAFETY FALLBACK (VERY IMPORTANT)
+        result.setdefault("sentiment", "Neutral")
+        result.setdefault("category", "General")
+        result.setdefault("urgency", "Medium")
+        result.setdefault("concern", "No concern")
 
     except Exception as e:
         print("ERROR:", str(e))
         raise HTTPException(status_code=500, detail=str(e))
 
-    # Save to DB
+
     db = SessionLocal()
-    record = Feedback(
-        customer_id=req.customer_id,
-        text=req.text,
-        sentiment=result.get("sentiment"),
-        concern=result.get("key_concern")
+
+    record = Ticket(
+        text=req.ticket_text,
+        email=req.email,
+        category=result["category"],
+        urgency=result["urgency"],
+        sentiment=result["sentiment"],
+        concern=result["concern"]
     )
+
     db.add(record)
     db.commit()
     db.close()
 
-    return result
 
-# =========================
-# STATS API
-# =========================
+    return {
+        "email": req.email,
+        "sentiment": result["sentiment"],
+        "category": result["category"],
+        "urgency": result["urgency"],
+        "concern": result["concern"]
+    }
+
 @app.get("/feedback/stats")
 async def sentiment_stats():
     db = SessionLocal()
 
     results = db.query(
-        Feedback.sentiment,
+        Ticket.sentiment,
         func.count()
-    ).group_by(Feedback.sentiment).all()
+    ).group_by(Ticket.sentiment).all()
 
     total = sum(row[1] for row in results)
     stats = {row[0]: row[1] for row in results}
@@ -149,22 +162,21 @@ async def sentiment_stats():
         "total": total
     }
 
-# =========================
-# RECENT FEEDBACK API
-# =========================
 @app.get("/feedback/recent")
 async def recent_feedback():
     db = SessionLocal()
 
-    records = db.query(Feedback)\
-        .order_by(Feedback.created_at.desc())\
+    records = db.query(Ticket)\
+        .order_by(Ticket.created_at.desc())\
         .limit(10).all()
 
     result = [
         {
-            "customer_id": r.customer_id,
+            "email": r.email,
             "text": r.text,
             "sentiment": r.sentiment,
+            "category": r.category,
+            "urgency": r.urgency,
             "concern": r.concern,
             "created_at": r.created_at.isoformat() if r.created_at else ""
         }

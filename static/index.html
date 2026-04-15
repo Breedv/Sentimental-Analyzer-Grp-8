@@ -458,9 +458,9 @@
 
   <!-- Main Grid -->
   <div class="main-grid">
-    <!-- Submit Form -->
+    <!-- LEFT PANEL - User Input -->
     <div class="panel">
-      <div class="panel-title">Submit Feedback</div>
+      <div class="panel-title">User Input</div>
 
       <div class="form-group">
         <label>CUSTOMER ID</label>
@@ -472,7 +472,7 @@
         <textarea id="feedback-text" placeholder="Enter customer feedback here..."></textarea>
       </div>
 
-      <button class="submit-btn" id="submit-btn" onclick="submitFeedback()">
+      <button class="submit-btn" id="submit-btn-manual" onclick="submitManualFeedback()">
         Analyze Sentiment
       </button>
 
@@ -482,6 +482,37 @@
       </div>
     </div>
 
+    <!-- RIGHT PANEL - Ticket & Email -->
+    <div class="panel">
+      <div class="panel-title">Ticket & Email</div>
+
+      <div class="form-group">
+        <label>EMAIL</label>
+        <input type="email" id="customer-email" placeholder="e.g. customer@example.com" />
+      </div>
+
+      <div class="form-group">
+        <label>TICKET</label>
+        <textarea id="ticket-text" placeholder="Enter ticket details here..."></textarea>
+      </div>
+
+      <button class="submit-btn" id="submit-btn-pipeline" onclick="submitPipelineFeedback()">
+        Analyze Sentiment
+      </button>
+
+      <div class="result-box" id="result-box-pipeline">
+        <div class="result-sentiment" id="result-sentiment-pipeline"></div>
+        <div class="result-concern" id="result-concern-pipeline"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Stats and Chart Row -->
+  <div class="main-grid">
+    <!-- Empty for now -->
+  </div>
+
+  <div class="main-grid">
     <!-- Chart Panel -->
     <div class="panel">
       <div class="panel-title">Sentiment Distribution</div>
@@ -505,7 +536,7 @@
     </div>
   </div>
 
-  <!-- Recent Feedback -->
+  <!-- Recent Feedback 
   <div class="feed-section">
     <div class="panel">
       <div class="panel-title">Recent Feedback</div>
@@ -513,22 +544,24 @@
         <div class="empty-state">NO FEEDBACK YET — SUBMIT YOUR FIRST ONE ABOVE</div>
       </div>
     </div>
-  </div>
+  </div>-->
 </div>
-
 <script>
-  const API = 'http://127.0.0.1:8000'; // same origin
+  const API = 'http://127.0.0.1:8000';
 
-  async function submitFeedback() {
+  async function submitManualFeedback() {
     const customerId = document.getElementById('customer-id').value.trim();
-    const text = document.getElementById('feedback-text').value.trim();
+    const feedbackText = document.getElementById('feedback-text').value.trim();
 
-    if (!customerId || !text) {
-      alert('Please fill in both fields.');
+    if (!customerId || !feedbackText) {
+      alert('Please fill in Customer ID and Feedback Text on the left panel.');
       return;
     }
 
-    const btn = document.getElementById('submit-btn');
+    // Generate email from customer ID
+    const generatedEmail = `${customerId}@feedback.local`;
+
+    const btn = document.getElementById('submit-btn-manual');
     btn.disabled = true;
     btn.innerHTML = '<span class="spinner"></span>Analyzing...';
 
@@ -536,25 +569,80 @@
     resultBox.classList.remove('show');
 
     try {
-      const res = await fetch(`${API}/feedback`, {
+      const res = await fetch(`${API}/agent/ticket-classifier`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ customer_id: customerId, text })
+        body: JSON.stringify({
+          email: generatedEmail,
+          ticket_text: feedbackText
+        })
       });
 
       const data = await res.json();
 
       const sentiment = data.sentiment || "Unknown";
-
-        document.getElementById('result-sentiment').textContent = sentiment;
-        document.getElementById('result-sentiment').className =`result-sentiment ${sentiment}`;
+      document.getElementById('result-sentiment').textContent = sentiment;
       document.getElementById('result-sentiment').className = `result-sentiment ${data.sentiment}`;
-      const concern = data.key_concern || data.concern || "No concern detected";
 
-        document.getElementById('result-concern').textContent = `→ ${concern}`;
+      const concern = data.concern || "No concern detected";
+      document.getElementById('result-concern').innerHTML =
+        `→ ${concern}<br>📂 ${data.category} | ⚡ ${data.urgency}`;
+
       resultBox.classList.add('show');
 
+      document.getElementById('customer-id').value = '';
       document.getElementById('feedback-text').value = '';
+
+      await loadStats();
+      await loadRecent();
+    } catch (e) {
+      alert('Error connecting to backend. Make sure the server is running.');
+    } finally {
+      btn.disabled = false;
+      btn.innerHTML = 'Analyze Sentiment';
+    }
+  }
+
+  async function submitPipelineFeedback() {
+    const email = document.getElementById('customer-email').value.trim();
+    const ticket_text = document.getElementById('ticket-text').value.trim();
+
+    if (!email || !ticket_text) {
+      alert('Please fill in Email and Ticket on the right panel.');
+      return;
+    }
+
+    const btn = document.getElementById('submit-btn-pipeline');
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner"></span>Analyzing...';
+
+    const resultBox = document.getElementById('result-box-pipeline');
+    resultBox.classList.remove('show');
+
+    try {
+      const res = await fetch(`${API}/agent/ticket-classifier`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: email,
+          ticket_text: ticket_text
+        })
+      });
+
+      const data = await res.json();
+
+      const sentiment = data.sentiment || "Unknown";
+      document.getElementById('result-sentiment-pipeline').textContent = sentiment;
+      document.getElementById('result-sentiment-pipeline').className = `result-sentiment ${data.sentiment}`;
+
+      const concern = data.concern || "No concern detected";
+      document.getElementById('result-concern-pipeline').innerHTML =
+        `→ ${concern}<br>📂 ${data.category} | ⚡ ${data.urgency}`;
+
+      resultBox.classList.add('show');
+
+      document.getElementById('customer-email').value = '';
+      document.getElementById('ticket-text').value = '';
 
       await loadStats();
       await loadRecent();
@@ -583,9 +671,12 @@
       document.getElementById('count-negative').textContent = stats['Negative'] || 0;
 
       const max = total || 1;
-      document.getElementById('bar-positive').style.width = `${((stats['Positive'] || 0) / max) * 100}%`;
-      document.getElementById('bar-neutral').style.width = `${((stats['Neutral'] || 0) / max) * 100}%`;
-      document.getElementById('bar-negative').style.width = `${((stats['Negative'] || 0) / max) * 100}%`;
+      document.getElementById('bar-positive').style.width =
+        `${((stats['Positive'] || 0) / max) * 100}%`;
+      document.getElementById('bar-neutral').style.width =
+        `${((stats['Neutral'] || 0) / max) * 100}%`;
+      document.getElementById('bar-negative').style.width =
+        `${((stats['Negative'] || 0) / max) * 100}%`;
     } catch (e) {}
   }
 
@@ -596,34 +687,38 @@
       const list = document.getElementById('feed-list');
 
       if (!data.length) {
-        list.innerHTML = '<div class="empty-state">NO FEEDBACK YET — SUBMIT YOUR FIRST ONE ABOVE</div>';
+        list.innerHTML =
+          '<div class="empty-state">NO FEEDBACK YET — SUBMIT YOUR FIRST ONE ABOVE</div>';
         return;
       }
 
+      // ✅ Display feedback from database
       list.innerHTML = data.map(item => `
         <div class="feed-item">
           <div class="feed-dot ${item.sentiment}"></div>
           <div>
             <div class="feed-text">${item.text}</div>
             <div class="feed-concern">→ ${item.concern}</div>
-            <div class="feed-meta">${item.customer_id} · ${new Date(item.created_at).toLocaleString()}</div>
+            <div class="feed-meta">
+              ${item.customer_id} · ${new Date(item.created_at).toLocaleString()}
+            </div>
           </div>
-          <span class="sentiment-tag ${item.sentiment}">${item.sentiment.toUpperCase()}</span>
+          <span class="sentiment-tag ${item.sentiment}">
+            ${item.sentiment.toUpperCase()}
+          </span>
         </div>
       `).join('');
+
     } catch (e) {}
   }
 
-  // Allow Enter key in customer id to jump to textarea
   document.getElementById('customer-id').addEventListener('keydown', e => {
     if (e.key === 'Enter') document.getElementById('feedback-text').focus();
   });
 
-  // Load on start
   loadStats();
   loadRecent();
 
-  // Auto refresh every 10 seconds
   setInterval(() => { loadStats(); loadRecent(); }, 10000);
 </script>
 </body>
