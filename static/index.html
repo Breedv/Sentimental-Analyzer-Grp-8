@@ -1,0 +1,630 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SentientAI — Feedback Intelligence</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Syne:wght@400;600;800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #080c10;
+    --surface: #0d1117;
+    --border: #1e2730;
+    --accent: #00e5ff;
+    --accent2: #ff3d6b;
+    --accent3: #b8ff57;
+    --text: #e8edf2;
+    --muted: #4a5568;
+    --positive: #b8ff57;
+    --neutral: #00e5ff;
+    --negative: #ff3d6b;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Syne', sans-serif;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* Grid background */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image:
+      linear-gradient(rgba(0,229,255,0.03) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(0,229,255,0.03) 1px, transparent 1px);
+    background-size: 40px 40px;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .container {
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 0 24px;
+    position: relative;
+    z-index: 1;
+  }
+
+  /* Header */
+  header {
+    padding: 32px 0 24px;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 48px;
+  }
+
+  .header-inner {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .logo {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .logo-icon {
+    width: 36px;
+    height: 36px;
+    background: var(--accent);
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 18px;
+  }
+
+  .logo-text {
+    font-size: 22px;
+    font-weight: 800;
+    letter-spacing: -0.5px;
+  }
+
+  .logo-text span {
+    color: var(--accent);
+  }
+
+  .badge {
+    font-family: 'Space Mono', monospace;
+    font-size: 11px;
+    color: var(--muted);
+    border: 1px solid var(--border);
+    padding: 4px 10px;
+    border-radius: 4px;
+    letter-spacing: 1px;
+  }
+
+  /* Stats bar */
+  .stats-bar {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 16px;
+    margin-bottom: 48px;
+  }
+
+  .stat-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 20px;
+    position: relative;
+    overflow: hidden;
+    transition: border-color 0.2s;
+  }
+
+  .stat-card::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 2px;
+  }
+
+  .stat-card.total::before { background: var(--accent); }
+  .stat-card.positive::before { background: var(--positive); }
+  .stat-card.neutral::before { background: var(--neutral); }
+  .stat-card.negative::before { background: var(--negative); }
+
+  .stat-label {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 2px;
+    color: var(--muted);
+    text-transform: uppercase;
+    margin-bottom: 10px;
+  }
+
+  .stat-value {
+    font-size: 36px;
+    font-weight: 800;
+    line-height: 1;
+  }
+
+  .stat-card.total .stat-value { color: var(--accent); }
+  .stat-card.positive .stat-value { color: var(--positive); }
+  .stat-card.neutral .stat-value { color: var(--neutral); }
+  .stat-card.negative .stat-value { color: var(--negative); }
+
+  /* Main grid */
+  .main-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 24px;
+    margin-bottom: 48px;
+  }
+
+  .panel {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 28px;
+  }
+
+  .panel-title {
+    font-family: 'Space Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 2px;
+    color: var(--muted);
+    text-transform: uppercase;
+    margin-bottom: 24px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .panel-title::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: var(--border);
+  }
+
+  /* Form */
+  .form-group {
+    margin-bottom: 16px;
+  }
+
+  label {
+    display: block;
+    font-size: 12px;
+    color: var(--muted);
+    margin-bottom: 8px;
+    font-family: 'Space Mono', monospace;
+    letter-spacing: 1px;
+  }
+
+  input, textarea {
+    width: 100%;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 12px 16px;
+    color: var(--text);
+    font-family: 'Syne', sans-serif;
+    font-size: 14px;
+    transition: border-color 0.2s, box-shadow 0.2s;
+    outline: none;
+    resize: none;
+  }
+
+  input:focus, textarea:focus {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px rgba(0,229,255,0.08);
+  }
+
+  textarea { height: 110px; }
+
+  .submit-btn {
+    width: 100%;
+    padding: 14px;
+    background: var(--accent);
+    color: var(--bg);
+    border: none;
+    border-radius: 8px;
+    font-family: 'Syne', sans-serif;
+    font-size: 15px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: opacity 0.2s, transform 0.1s;
+    letter-spacing: 0.5px;
+    margin-top: 8px;
+  }
+
+  .submit-btn:hover { opacity: 0.85; }
+  .submit-btn:active { transform: scale(0.98); }
+  .submit-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+  /* Result */
+  .result-box {
+    display: none;
+    margin-top: 20px;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 20px;
+    animation: fadeIn 0.3s ease;
+  }
+
+  .result-box.show { display: block; }
+
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(8px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .result-sentiment {
+    font-size: 28px;
+    font-weight: 800;
+    margin-bottom: 8px;
+  }
+
+  .result-sentiment.Positive { color: var(--positive); }
+  .result-sentiment.Neutral { color: var(--neutral); }
+  .result-sentiment.Negative { color: var(--negative); }
+
+  .result-concern {
+    font-size: 14px;
+    color: var(--muted);
+    font-family: 'Space Mono', monospace;
+    line-height: 1.5;
+  }
+
+  /* Sentiment bar chart */
+  .bar-chart {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    margin-top: 8px;
+  }
+
+  .bar-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .bar-label {
+    font-family: 'Space Mono', monospace;
+    font-size: 11px;
+    width: 70px;
+    color: var(--muted);
+    letter-spacing: 1px;
+  }
+
+  .bar-track {
+    flex: 1;
+    height: 8px;
+    background: var(--border);
+    border-radius: 4px;
+    overflow: hidden;
+  }
+
+  .bar-fill {
+    height: 100%;
+    border-radius: 4px;
+    transition: width 0.8s cubic-bezier(0.16, 1, 0.3, 1);
+    width: 0%;
+  }
+
+  .bar-fill.Positive { background: var(--positive); }
+  .bar-fill.Neutral { background: var(--neutral); }
+  .bar-fill.Negative { background: var(--negative); }
+
+  .bar-count {
+    font-family: 'Space Mono', monospace;
+    font-size: 12px;
+    color: var(--text);
+    width: 24px;
+    text-align: right;
+  }
+
+  /* Recent feedback */
+  .feed-section {
+    margin-bottom: 48px;
+  }
+
+  .feed-list {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .feed-item {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 18px 20px;
+    display: grid;
+    grid-template-columns: auto 1fr auto;
+    gap: 16px;
+    align-items: start;
+    animation: fadeIn 0.3s ease;
+    transition: border-color 0.2s;
+  }
+
+  .feed-item:hover { border-color: var(--muted); }
+
+  .feed-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    margin-top: 5px;
+    flex-shrink: 0;
+  }
+
+  .feed-dot.Positive { background: var(--positive); box-shadow: 0 0 8px var(--positive); }
+  .feed-dot.Neutral { background: var(--neutral); box-shadow: 0 0 8px var(--neutral); }
+  .feed-dot.Negative { background: var(--negative); box-shadow: 0 0 8px var(--negative); }
+
+  .feed-text {
+    font-size: 14px;
+    line-height: 1.5;
+    color: var(--text);
+    margin-bottom: 4px;
+  }
+
+  .feed-meta {
+    font-family: 'Space Mono', monospace;
+    font-size: 11px;
+    color: var(--muted);
+  }
+
+  .feed-concern {
+    font-family: 'Space Mono', monospace;
+    font-size: 11px;
+    color: var(--muted);
+    margin-top: 4px;
+  }
+
+  .sentiment-tag {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    padding: 3px 8px;
+    border-radius: 4px;
+    letter-spacing: 1px;
+    white-space: nowrap;
+  }
+
+  .sentiment-tag.Positive { background: rgba(184,255,87,0.1); color: var(--positive); }
+  .sentiment-tag.Neutral { background: rgba(0,229,255,0.1); color: var(--neutral); }
+  .sentiment-tag.Negative { background: rgba(255,61,107,0.1); color: var(--negative); }
+
+  /* Loading spinner */
+  .spinner {
+    display: inline-block;
+    width: 16px; height: 16px;
+    border: 2px solid var(--bg);
+    border-top-color: transparent;
+    border-radius: 50%;
+    animation: spin 0.6s linear infinite;
+    vertical-align: middle;
+    margin-right: 8px;
+  }
+
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .empty-state {
+    text-align: center;
+    padding: 40px;
+    color: var(--muted);
+    font-family: 'Space Mono', monospace;
+    font-size: 12px;
+    letter-spacing: 1px;
+  }
+
+  @media (max-width: 768px) {
+    .stats-bar { grid-template-columns: repeat(2, 1fr); }
+    .main-grid { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+<div class="container">
+  <header>
+    <div class="header-inner">
+      <div class="logo">
+        <div class="logo-icon">⚡</div>
+        <div class="logo-text">Sentient<span>AI</span></div>
+      </div>
+      <div class="badge">FEEDBACK INTELLIGENCE v1.0</div>
+    </div>
+  </header>
+
+  <!-- Stats Bar -->
+  <div class="stats-bar">
+    <div class="stat-card total">
+      <div class="stat-label">Total Feedback</div>
+      <div class="stat-value" id="stat-total">0</div>
+    </div>
+    <div class="stat-card positive">
+      <div class="stat-label">Positive</div>
+      <div class="stat-value" id="stat-positive">0</div>
+    </div>
+    <div class="stat-card neutral">
+      <div class="stat-label">Neutral</div>
+      <div class="stat-value" id="stat-neutral">0</div>
+    </div>
+    <div class="stat-card negative">
+      <div class="stat-label">Negative</div>
+      <div class="stat-value" id="stat-negative">0</div>
+    </div>
+  </div>
+
+  <!-- Main Grid -->
+  <div class="main-grid">
+    <!-- Submit Form -->
+    <div class="panel">
+      <div class="panel-title">Submit Feedback</div>
+
+      <div class="form-group">
+        <label>CUSTOMER ID</label>
+        <input type="text" id="customer-id" placeholder="e.g. cust_001" />
+      </div>
+
+      <div class="form-group">
+        <label>FEEDBACK TEXT</label>
+        <textarea id="feedback-text" placeholder="Enter customer feedback here..."></textarea>
+      </div>
+
+      <button class="submit-btn" id="submit-btn" onclick="submitFeedback()">
+        Analyze Sentiment
+      </button>
+
+      <div class="result-box" id="result-box">
+        <div class="result-sentiment" id="result-sentiment"></div>
+        <div class="result-concern" id="result-concern"></div>
+      </div>
+    </div>
+
+    <!-- Chart Panel -->
+    <div class="panel">
+      <div class="panel-title">Sentiment Distribution</div>
+      <div class="bar-chart">
+        <div class="bar-row">
+          <div class="bar-label">POSITIVE</div>
+          <div class="bar-track"><div class="bar-fill Positive" id="bar-positive"></div></div>
+          <div class="bar-count" id="count-positive">0</div>
+        </div>
+        <div class="bar-row">
+          <div class="bar-label">NEUTRAL</div>
+          <div class="bar-track"><div class="bar-fill Neutral" id="bar-neutral"></div></div>
+          <div class="bar-count" id="count-neutral">0</div>
+        </div>
+        <div class="bar-row">
+          <div class="bar-label">NEGATIVE</div>
+          <div class="bar-track"><div class="bar-fill Negative" id="bar-negative"></div></div>
+          <div class="bar-count" id="count-negative">0</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Recent Feedback -->
+  <div class="feed-section">
+    <div class="panel">
+      <div class="panel-title">Recent Feedback</div>
+      <div class="feed-list" id="feed-list">
+        <div class="empty-state">NO FEEDBACK YET — SUBMIT YOUR FIRST ONE ABOVE</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  const API = 'http://127.0.0.1:8000'; // same origin
+
+  async function submitFeedback() {
+    const customerId = document.getElementById('customer-id').value.trim();
+    const text = document.getElementById('feedback-text').value.trim();
+
+    if (!customerId || !text) {
+      alert('Please fill in both fields.');
+      return;
+    }
+
+    const btn = document.getElementById('submit-btn');
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner"></span>Analyzing...';
+
+    const resultBox = document.getElementById('result-box');
+    resultBox.classList.remove('show');
+
+    try {
+      const res = await fetch(`${API}/feedback`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ customer_id: customerId, text })
+      });
+
+      const data = await res.json();
+
+      const sentiment = data.sentiment || "Unknown";
+
+        document.getElementById('result-sentiment').textContent = sentiment;
+        document.getElementById('result-sentiment').className =`result-sentiment ${sentiment}`;
+      document.getElementById('result-sentiment').className = `result-sentiment ${data.sentiment}`;
+      const concern = data.key_concern || data.concern || "No concern detected";
+
+        document.getElementById('result-concern').textContent = `→ ${concern}`;
+      resultBox.classList.add('show');
+
+      document.getElementById('feedback-text').value = '';
+
+      await loadStats();
+      await loadRecent();
+    } catch (e) {
+      alert('Error connecting to backend. Make sure the server is running.');
+    } finally {
+      btn.disabled = false;
+      btn.innerHTML = 'Analyze Sentiment';
+    }
+  }
+
+  async function loadStats() {
+    try {
+      const res = await fetch(`${API}/feedback/stats`);
+      const data = await res.json();
+      const stats = data.stats || {};
+      const total = data.total || 0;
+
+      document.getElementById('stat-total').textContent = total;
+      document.getElementById('stat-positive').textContent = stats['Positive'] || 0;
+      document.getElementById('stat-neutral').textContent = stats['Neutral'] || 0;
+      document.getElementById('stat-negative').textContent = stats['Negative'] || 0;
+
+      document.getElementById('count-positive').textContent = stats['Positive'] || 0;
+      document.getElementById('count-neutral').textContent = stats['Neutral'] || 0;
+      document.getElementById('count-negative').textContent = stats['Negative'] || 0;
+
+      const max = total || 1;
+      document.getElementById('bar-positive').style.width = `${((stats['Positive'] || 0) / max) * 100}%`;
+      document.getElementById('bar-neutral').style.width = `${((stats['Neutral'] || 0) / max) * 100}%`;
+      document.getElementById('bar-negative').style.width = `${((stats['Negative'] || 0) / max) * 100}%`;
+    } catch (e) {}
+  }
+
+  async function loadRecent() {
+    try {
+      const res = await fetch(`${API}/feedback/recent`);
+      const data = await res.json();
+      const list = document.getElementById('feed-list');
+
+      if (!data.length) {
+        list.innerHTML = '<div class="empty-state">NO FEEDBACK YET — SUBMIT YOUR FIRST ONE ABOVE</div>';
+        return;
+      }
+
+      list.innerHTML = data.map(item => `
+        <div class="feed-item">
+          <div class="feed-dot ${item.sentiment}"></div>
+          <div>
+            <div class="feed-text">${item.text}</div>
+            <div class="feed-concern">→ ${item.concern}</div>
+            <div class="feed-meta">${item.customer_id} · ${new Date(item.created_at).toLocaleString()}</div>
+          </div>
+          <span class="sentiment-tag ${item.sentiment}">${item.sentiment.toUpperCase()}</span>
+        </div>
+      `).join('');
+    } catch (e) {}
+  }
+
+  // Allow Enter key in customer id to jump to textarea
+  document.getElementById('customer-id').addEventListener('keydown', e => {
+    if (e.key === 'Enter') document.getElementById('feedback-text').focus();
+  });
+
+  // Load on start
+  loadStats();
+  loadRecent();
+
+  // Auto refresh every 10 seconds
+  setInterval(() => { loadStats(); loadRecent(); }, 10000);
+</script>
+</body>
+</html>
